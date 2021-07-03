@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:string_validator/string_validator.dart';
+import 'package:http/http.dart' as http;
 
 class Body extends StatefulWidget {
   const Body({Key? key}) : super(key: key);
@@ -10,7 +12,37 @@ class Body extends StatefulWidget {
 
 class _BodyState extends State<Body> {
   final _formKey = GlobalKey<FormState>();
-  var dest;
+  var dest, _post;
+  bool visiblity = false;
+  @override
+  void initState() {
+    super.initState();
+  }
+
+  Future<Map<String, dynamic>> fetchData() async {
+    print("Fetch data is called");
+    Map<String, String> header = {
+      'Accept': 'application/json',
+      "Access-Control-Allow-Headers": "Access-Control-Allow-Origin, Accept",
+      'Authorization': '<Your token>'
+    };
+    print(dest);
+
+    final response = await http
+        .post(Uri.parse('http://192.168.100.9:7001/'), headers: header, body: {
+      "trace": dest,
+    });
+    if (response.statusCode == 200) {
+      print(response.body);
+      var jsonResponse = json.decode(response.body);
+      print(jsonResponse);
+      return jsonResponse;
+    } else {
+      print(response.statusCode);
+      throw Exception('Unexpected error occured!');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Form(
@@ -27,6 +59,9 @@ class _BodyState extends State<Body> {
                   // you'd often call a server or save the information in a database.
                   ScaffoldMessenger.of(context)
                       .showSnackBar(SnackBar(content: Text('Processing Data')));
+                  setState(() {
+                    _post = fetchData();
+                  });
                 }
               },
               child: Text(
@@ -57,6 +92,38 @@ class _BodyState extends State<Body> {
                 alignment: Alignment.center, //set the button's child Alignment
               ),
             ),
+            Container(
+              child: FutureBuilder<Map<String, dynamic>>(
+                future: _post,
+                builder: (context, snapshot) {
+                  if (snapshot.hasData) {
+                    print(snapshot.data);
+                    return Expanded(
+                      child: ListView.builder(
+                          // physics: AlwaysScrollableScrollPhysics(),
+                          // shrinkWrap: false,
+                          itemCount: snapshot.data!.length,
+                          itemBuilder: (BuildContext context, int index) {
+                            return Card(
+                        
+                              color: Colors.black,
+                              child: Center(
+                                child: Text(snapshot.data!.values
+                                    .elementAt(index)
+                                    .toString(), style: TextStyle(color: Colors.lightGreen, fontSize: 20),),
+                              ),
+                            );
+                          }),
+                    );
+                    
+                  } else if (snapshot.hasError) {
+                    return Text("${snapshot.error}");
+                  }
+                  // By default show a loading spinner.
+                  return SizedBox();
+                },
+              ),
+            ),
           ]),
         ));
   }
@@ -71,10 +138,8 @@ class _BodyState extends State<Body> {
           print(isIP(value.toString()));
           print(isFQDN(value.toString()));
           return "Input field can not be empty";
-        }
-        else if(!(isIP(value.toString()) || isFQDN(value.toString()))){
+        } else if (!(isIP(value.toString()) || isFQDN(value.toString()))) {
           return "Please enter valid input";
-
         }
         return null;
       },
